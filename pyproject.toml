@@ -1,0 +1,32 @@
+[project]
+name = "doi-fetch"
+version = "1.0.0"
+description = "Batch DOI-to-Zotero SQLite fetcher with async concurrency"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "AKI-215" }]
+keywords = ["doi", "crossref", "zotero", "sqlite", "metadata", "bibliography"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Text Processing :: Markup :: LaTeX",
+]
+
+dependencies = [
+    "aiohttp>=3.9",
+]
+
+[project.scripts]
+doi-fetch = "doi_fetch:main"
+
+[project.urls]
+Homepage = "https://github.com/AKI-215/doi-fetch"
+Repository = "https://github.com/AKI-215/doi-fetch.git"
+Issues = "https://github.com/AKI-215/doi-fetch/issues"

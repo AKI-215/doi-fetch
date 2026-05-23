@@ -435,8 +435,9 @@ class ZoteroDB:
 
     def insert_item(self, entry: dict) -> int | None:
         doi = entry["doi"]
-        if self.conn.execute("SELECT 1 FROM doi_fetch_log WHERE doi=?", (doi,)).fetchone():
-            return None  # already fetched
+        row = self.conn.execute("SELECT status FROM doi_fetch_log WHERE doi=?", (doi,)).fetchone()
+        if row and row[0] == "ok":
+            return None  # already successfully fetched
 
         item_type_id = CROSSREF_TYPE_MAP.get(entry.get("type"), ITEM_TYPE_JOURNAL_ARTICLE)
         field_set = ITEM_TYPE_FIELD_MAP.get(item_type_id, {1, 2, 6, 7, 11, 13, 14, 15, 59})
@@ -573,7 +574,7 @@ class ZoteroDB:
 
 # ── Main ──────────────────────────────────────────────────────────────
 
-async def main():
+async def _main():
     import argparse
     p = argparse.ArgumentParser(description="Batch DOI→Zotero SQLite fetcher")
     p.add_argument("-i", "--input", help="File with one DOI per line")
@@ -679,5 +680,10 @@ def _bibtex(e: dict) -> str:
     return "\n".join(lines)
 
 
+def main():
+    """Entry point for CLI."""
+    asyncio.run(_main())
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
