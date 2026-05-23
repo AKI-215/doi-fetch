@@ -1,24 +1,33 @@
-# doi-fetch
+# doi-fetch · DOI 批量元数据抓取工具
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/AKI-215/doi-fetch/pulls)
 
-Batch DOI-to-metadata fetcher with **async concurrency** and **Zotero-compatible SQLite** output.
+批量 DOI → 元数据 / Batch DOI → metadata
 
-Give it a list of DOIs — it hits CrossRef (with DataCite fallback) in parallel, parses the metadata, and writes a SQLite database that Zotero can open directly. Also supports JSON and BibTeX export.
+给定一批 DOI，并发的从 CrossRef（DataCite 兜底）抓取元数据，写入 **Zotero 兼容 SQLite**。同时支持 JSON 和 BibTeX 导出。
 
-## Features
+Give it a list of DOIs — it hits CrossRef (with DataCite fallback) in parallel, parses metadata, and writes a **Zotero-compatible SQLite** database. JSON and BibTeX export also supported.
 
-- **True concurrency** — `aiohttp` + `asyncio.Semaphore`, up to 30 parallel connections
-- **Zotero-compatible SQLite** — mirrors `zotero.sqlite` schema exactly (items, itemData, creators, etc.)
-- **Incremental** — `--merge` skips already-fetched DOIs, never refetches
+---
+
+## 功能 / Features
+
+- **真正并发** — `aiohttp` + `asyncio.Semaphore`，最多 30 并发
+- **Zotero SQLite** — 完全对齐 `zotero.sqlite` schema
+- **增量追加** — `--merge` 模式，已抓取的不重复
+- **多格式** — SQLite / JSON / BibTeX
+- **智能提取** — 从任意文本中自动识别 DOI
+- **零配置** — 无需 API Key
+- **True concurrency** — up to 30 parallel connections
+- **Zotero-compatible SQLite** — exact schema match
+- **Incremental** — `--merge` skips already-fetched DOIs
 - **Multi-format** — SQLite, JSON, BibTeX
-- **Auto DOI extraction** — paste raw text, it finds all DOIs
-- **CrossRef first**, DataCite fallback
+- **Auto DOI extraction** — paste raw text, finds all DOIs
 - **Zero-config** — no API key required
 
-## Install
+## 安装 / Install
 
 ```bash
 pip install aiohttp
@@ -26,142 +35,114 @@ git clone https://github.com/AKI-215/doi-fetch.git
 cd doi-fetch
 ```
 
-Or via pip (coming soon to PyPI):
+## 快速开始 / Quick Start
 
 ```bash
-pip install doi-fetch
-```
-
-## Quick Start
-
-```bash
-# Two DOIs on command line → Zotero SQLite
+# 命令行直接给 DOI / DOIs on command line
 python doi_fetch.py -d 10.1038/s41586-021-03819-2 10.1126/science.1258096
 
-# From file, high concurrency
+# 从文件批量抓取 / From file, high concurrency
 python doi_fetch.py -i dois.txt -c 20 -o library.sqlite
 
-# Incremental: merge new DOIs into existing DB
+# 增量追加 / Incremental merge
 python doi_fetch.py -i new_batch.txt -o library.sqlite --merge
 
-# JSON or BibTeX output
+# JSON / BibTeX 导出
 python doi_fetch.py -i dois.txt --format json -o refs.json
 python doi_fetch.py -i dois.txt --format bibtex -o refs.bib
 
-# Extract DOIs embedded in text
-python doi_fetch.py --from-text "See 10.1038/s41586-021-03819-2 and 10.1126/science.1258096" -o refs.json
+# 从文本中提取 DOI / Extract from raw text
+python doi_fetch.py --from-text "参见 10.1038/s41586-021-03819-2 和 10.1126/science.1258096"
 ```
 
-## Usage
+## 选项 / Options
 
-```
-python doi_fetch.py [OPTIONS]
+| 参数 | 说明 |
+|------|------|
+| `-i, --input FILE` | DOI 文件（每行一个，或含 DOI 的文本） |
+| `-d, --dois DOI ...` | 命令行直接给定 DOI |
+| `-o, --output FILE` | 输出文件（默认 `zotero.sqlite`） |
+| `-c, --concurrency N` | 并发数（默认 10，最大 30） |
+| `--merge` | 并入已有库，跳过已抓取 |
+| `--format sqlite\|json\|bibtex` | 输出格式（默认 sqlite） |
+| `--from-text TEXT` | 从文本中提取 DOI |
 
-Options:
-  -i, --input FILE       File with DOIs (one per line, or text containing DOIs)
-  -d, --dois DOI [DOI...] DOIs directly on command line
-  -o, --output FILE      Output file (default: zotero.sqlite)
-  -c, --concurrency N    Concurrent requests (default: 10, max: 30)
-  --merge                Merge into existing output (skip already-fetched)
-  --format {sqlite|json|bibtex}  Output format (default: sqlite)
-  --from-text TEXT       Extract DOIs from arbitrary text
-```
+## 输出格式 / Output Formats
 
-## Output: Zotero SQLite (`--format sqlite`, default)
+### SQLite（默认）
 
-The generated `.sqlite` database mirrors Zotero's core schema exactly:
+完全对齐 Zotero 核心 schema：
 
-| Table | Content |
-|-------|---------|
-| `items` | One row per DOI — itemTypeID (22=journalArticle), Zotero-style key, timestamps |
-| `itemData` | EAV links: `(itemID, fieldID, valueID)` |
-| `itemDataValues` | Deduplicated strings — titles, abstracts, DOIs |
-| `creators` | Deduplicated `(firstName, lastName)` |
-| `itemCreators` | Ordered creator associations with creatorTypeID |
-| `itemTypes` | All 40 Zotero item types |
-| `fields` | All 123 Zotero fields |
-| `creatorTypes` | All 37 creator types |
-| `doi_fetch_log` | Per-DOI fetch status for `--merge` resume |
+| 表 / Table | 内容 / Content |
+|-----------|---------|
+| `items` | 每条 DOI 一行，含 itemTypeID、Zotero 风格 key、时间戳 |
+| `itemData` | EAV 关联 `(itemID, fieldID, valueID)` |
+| `itemDataValues` | 去重字符串（标题、摘要、DOI 等） |
+| `creators` | 去重 `(firstName, lastName)` |
+| `itemCreators` | 有序作者关联 |
+| `itemTypes` | 全部 40 种 Zotero 条目类型 |
+| `fields` | 全部 123 个 Zotero 字段 |
+| `creatorTypes` | 全部 37 种作者类型 |
+| `doi_fetch_log` | 每条 DOI 抓取状态，用于 `--merge` 去重 |
 
-Drop the `.sqlite` next to a Zotero `storage/` folder and Zotero opens it directly.
+把 `.sqlite` 放在 Zotero `storage/` 文件夹旁边即可直接打开。
 
-### Example output item
+### JSON
 
 ```json
 {
-  "title": "Highly accurate protein structure prediction with AlphaFold",
-  "authors": ["Jumper, John", "Evans, Richard", "..."],
-  "year": 2021,
-  "journal": "Nature",
-  "volume": "596",
-  "issue": "7873",
-  "pages": "583-589",
-  "doi": "10.1038/s41586-021-03819-2",
-  "abstract": "Proteins are essential to life...",
-  "publisher": "Springer Science and Business Media LLC",
-  "citation_key": "Jumper2021highly"
-}
-```
-
-## Output: JSON (`--format json`)
-
-```json
-{
-  "entries": { "10.1038/...": { ... }, ... },
+  "entries": { "10.1038/...": { ... } },
   "total": 445,
   "updated": "2026-05-22T10:30:00"
 }
 ```
 
-## Output: BibTeX (`--format bibtex`)
+### BibTeX
 
 ```bibtex
 @article{Jumper2021highly,
   author = {Jumper, John and Evans, Richard and ...},
-  title = {Highly accurate protein structure prediction with AlphaFold},
+  title  = {Highly accurate protein structure prediction with AlphaFold},
   journal = {Nature},
-  year = {2021},
+  year   = {2021},
   volume = {596},
-  number = {7873},
-  pages = {583--589},
-  doi = {10.1038/s41586-021-03819-2}
+  doi    = {10.1038/s41586-021-03819-2}
 }
 ```
 
-## Concurrency & Performance
+## 并发性能 / Concurrency
 
-| Concurrency | 445 DOIs | Notes |
-|------------|----------|-------|
-| 20 | ~50s | 364/445 first pass |
-| 10 | ~13s | retry batch, 52/81 |
-| 4 | ~6s | retry batch, 29/29 |
+| 并发数 | 445 篇 | 备注 |
+|--------|--------|------|
+| 20 | ~50s | 首轮 364/445 |
+| 10 | ~13s | 重试 52/81 |
+| 4 | ~6s | 重试 29/29 |
 
-- CrossRef polite pool: ~10 req/s without API key
-- Set `CROSSREF_API_KEY` env var for higher limits
-- `asyncio.Semaphore` prevents overwhelming APIs
-- Automatic `429 Too Many Requests` backoff (3s delay)
+- CrossRef 礼貌池 ~10 req/s（无 Key）
+- 设 `CROSSREF_API_KEY` 环境变量提升限速
+- 自动 429 退避（3s）
 
-## API Sources
+## API 来源 / Sources
 
-- **CrossRef** (primary) — richest metadata, free, no key required
-- **DataCite** (fallback) — covers datasets, preprints, grey literature
-- Set `CROSSREF_API_KEY` for higher rate limits if you have a Plus token
+- **CrossRef**（主） — 最丰富的元数据，免费
+- **DataCite**（备份） — 数据集、预印本、灰色文献
+- 如有 Plus Token，设 `CROSSREF_API_KEY` 提升速率
 
-## Real-World Example
+## 实际案例 / Real-World Example
 
-Used to fetch metadata for **445 iron-based alloy corrosion papers** from a WoS export:
+从 WoS 导出的 445 篇铁基合金腐蚀文献提取元数据：
 
 ```bash
-# Extract DOIs from CSV
+# 从 CSV 提取 DOI
 python -c "import csv; rows=list(csv.DictReader(open('papers.csv'))); \
   open('dois.txt','w').write('\n'.join(r['DOI'] for r in rows if r['DOI']))"
 
-# Fetch all 445 in ~60s
+# 60 秒内抓完全部
 python doi_fetch.py -i dois.txt -c 20 -o corrosion.sqlite
 
-# Result: 445 items, 1485 creators, full metadata
+# 结果: 445 条目, 1485 作者, 完整元数据
 ```
 
-## License
+## 许可 / License
 
-MIT — see [LICENSE](LICENSE).
+MIT — 详见 [LICENSE](LICENSE)。
